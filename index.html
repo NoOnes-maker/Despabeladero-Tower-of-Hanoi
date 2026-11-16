@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Towers of Hanoi - Prolog Execution & Smooth Animation</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        code, pre, .font-mono {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Animated disk styling with absolute positioning for smooth 2D trajectory path */
+        .animated-disk {
+            position: absolute;
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            z-index: 20;
+        }
+
+        .animated-disk { pointer-events: auto; cursor: grab; touch-action: none; user-select: none; }
+        .animated-disk.dragging { cursor: grabbing; z-index: 50; box-shadow: 0 12px 20px rgba(0,0,0,.5); }
+
+        /* Active highlight for prolog code line */
+        .highlight-line {
+            background-color: rgba(59, 130, 246, 0.25);
+            border-left: 4px solid #3b82f6;
+            padding-left: 8px;
+            margin-left: -12px;
+        }
+
+        /* Custom Scrollbar for Console */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header / Navbar -->
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-blue-600 rounded-lg shadow-lg shadow-blue-500/20">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white">Towers of Hanoi</h1>
+                <p class="text-xs text-slate-400">Prolog Logic & Smooth Trajectory Simulator (v3)</p>
+            </div>
+        </div>
+
+        <!-- Controls Header -->
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                <label for="diskCount" class="text-xs font-medium text-slate-300">Disks:</label>
+                <select id="diskCount" class="bg-slate-900 text-blue-400 font-semibold text-sm rounded px-2 py-1 outline-none border border-slate-700 focus:border-blue-500 transition">
+                    <option value="3" selected>3 Disks</option>
+                    <option value="4">4 Disks</option>
+                    <option value="5">5 Disks</option>
+                    <option value="6">6 Disks</option>
+                </select>
+            </div>
+
+            <div class="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                <label for="speedSelect" class="text-xs font-medium text-slate-300">Speed:</label>
+                <select id="speedSelect" class="bg-slate-900 text-emerald-400 font-semibold text-sm rounded px-2 py-1 outline-none border border-slate-700 focus:border-emerald-500 transition">
+                    <option value="1200">0.5x (Slow)</option>
+                    <option value="700" selected>1.0x (Normal)</option>
+                    <option value="350">2.0x (Fast)</option>
+                    <option value="180">4.0x (Ultra)</option>
+                </select>
+            </div>
+
+            <button id="btnPlayPause" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-1.5 rounded-lg text-sm flex items-center space-x-2 transition shadow-md shadow-blue-600/30">
+                <svg id="playIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6V4z"/></svg>
+                <span id="playBtnText">Auto Solve</span>
+            </button>
+
+            <button id="btnSound" title="Toggle sound effects" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium px-3 py-1.5 rounded-lg text-sm transition">
+                <span id="soundIcon">🔊</span> <span id="soundText">Sound On</span>
+            </button>
+
+            <button id="btnReset" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium px-3 py-1.5 rounded-lg text-sm transition">
+                Reset
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 max-w-7xl mx-auto w-full">
+        
+        <!-- Left Panel: Animation Area & Prolog Terminal -->
+        <div class="lg:col-span-7 flex flex-col space-y-6">
+            
+            <!-- Towers Canvas Card -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-6 flex flex-col justify-between shadow-xl relative min-h-[380px]">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Drag the top disk with your mouse, or press Auto Solve</span>
+                    <span id="stepCounter" class="text-xs font-mono bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700">
+                        Move: 0 / 7
+                    </span>
+                </div>
+
+                <!-- Pegs Area Stage -->
+                <div id="stage" class="relative w-full h-72 flex items-end justify-around pb-4">
+                    <!-- Base board -->
+                    <div class="absolute bottom-2 left-4 right-4 h-4 bg-amber-900/60 rounded-md border border-amber-700/50 z-0"></div>
+
+                    <!-- Peg Left -->
+                    <div id="peg-col-left" class="relative flex flex-col items-center w-1/3 h-full justify-end z-0">
+                        <div class="absolute bottom-4 w-3 bg-slate-700 rounded-t-md h-52 border-t border-x border-slate-600"></div>
+                        <span class="absolute -bottom-5 text-sm font-bold text-slate-400 font-mono">left</span>
+                    </div>
+
+                    <!-- Peg Right -->
+                    <div id="peg-col-right" class="relative flex flex-col items-center w-1/3 h-full justify-end z-0">
+                        <div class="absolute bottom-4 w-3 bg-slate-700 rounded-t-md h-52 border-t border-x border-slate-600"></div>
+                        <span class="absolute -bottom-5 text-sm font-bold text-slate-400 font-mono">center</span>
+                    </div>
+
+                    <!-- Peg Center -->
+                    <div id="peg-col-center" class="relative flex flex-col items-center w-1/3 h-full justify-end z-0">
+                        <div class="absolute bottom-4 w-3 bg-slate-700 rounded-t-md h-52 border-t border-x border-slate-600"></div>
+                        <span class="absolute -bottom-5 text-sm font-bold text-slate-400 font-mono">right</span>
+                    </div>
+
+                    <!-- Container for absolute positioned animated disks -->
+                    <div id="disks-container" class="absolute inset-0 pointer-events-none"></div>
+                </div>
+            </div>
+
+            <!-- Move comparison -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 shadow-xl">
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div class="bg-slate-900 rounded-lg py-2 border border-slate-800">
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400">Your moves</div>
+                        <div id="statYou" class="text-2xl font-bold text-blue-400 font-mono">0</div>
+                    </div>
+                    <div class="bg-slate-900 rounded-lg py-2 border border-slate-800">
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400">Prolog auto (optimal)</div>
+                        <div id="statOpt" class="text-2xl font-bold text-emerald-400 font-mono">7</div>
+                    </div>
+                    <div class="bg-slate-900 rounded-lg py-2 border border-slate-800">
+                        <div class="text-[10px] uppercase tracking-wider text-slate-400">Efficiency</div>
+                        <div id="statEff" class="text-2xl font-bold text-amber-400 font-mono">-</div>
+                    </div>
+                </div>
+                <p id="hint" class="mt-3 text-xs text-slate-400 text-center"></p>
+
+                <!-- Shown only after a manual solve -->
+                <div class="mt-3 flex flex-col items-center gap-2">
+                    <button id="btnDone" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2 rounded-lg text-sm transition shadow-md shadow-emerald-600/30">
+                        Done
+                    </button>
+                    <div id="autoPrompt" class="hidden w-full bg-slate-900 border border-emerald-700/50 rounded-lg p-3 text-center">
+                        <p class="text-sm text-slate-200 mb-3">Do you want to see the auto solve?</p>
+                        <div class="flex justify-center gap-3">
+                            <button id="btnAutoYes" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-1.5 rounded-lg text-sm transition">Yes, show me</button>
+                            <button id="btnAutoNo" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium px-5 py-1.5 rounded-lg text-sm transition">No thanks</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Prolog Console -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col h-52 shadow-xl">
+                <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                        <span class="text-xs font-mono text-slate-400 ml-2">Prolog Output Console</span>
+                    </div>
+                    <button id="btnClearConsole" class="text-xs text-slate-500 hover:text-slate-300 transition">Clear</button>
+                </div>
+                <div id="consoleOutput" class="flex-1 overflow-y-auto font-mono text-xs space-y-1 pr-2 text-slate-300">
+                    <p class="text-slate-500">% SWI-Prolog environment ready.</p>
+                    <p class="text-slate-500">% Load problem using: ?- move(N, left, right, center).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Prolog Source Code & Explanation -->
+        <div class="lg:col-span-5 flex flex-col space-y-6">
+            
+            <!-- Code Window -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col h-full">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                    <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                        <span>hanoi.pl</span>
+                        <span class="text-[10px] bg-blue-900/50 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded">TutorialsPoint Standard</span>
+                    </h2>
+                    <a href="https://www.tutorialspoint.com/prolog/prolog_towers_of_hanoi_problem.htm" target="_blank" rel="noopener" class="text-xs text-blue-400 hover:underline">Source ↗</a>
+                </div>
+
+                <!-- Prolog Code Blocks with dynamic highlight line -->
+                <div class="font-mono text-xs space-y-2 bg-slate-900/90 p-4 rounded-lg border border-slate-800 overflow-x-auto text-slate-300 leading-relaxed">
+                    <div id="code-base-case" class="transition-colors duration-200">
+                        <p class="text-slate-500">% Base case: Move 1 disk directly</p>
+                        <p><span class="text-blue-400 font-semibold">move</span>(1, X, Y, _) :-</p>
+                        <p class="pl-4">write(<span class="text-amber-300">'Move top disk from '</span>), write(X),</p>
+                        <p class="pl-4">write(<span class="text-amber-300">' to '</span>), write(Y), nl.</p>
+                    </div>
+
+                    <div class="my-2 border-t border-slate-800"></div>
+
+                    <div id="code-recursive-case" class="transition-colors duration-200">
+                        <p class="text-slate-500">% Recursive case: Move N disks</p>
+                        <p><span class="text-blue-400 font-semibold">move</span>(N, X, Y, Z) :-</p>
+                        <p class="pl-4">N &gt; 1,</p>
+                        <p class="pl-4">M <span class="text-emerald-400">is</span> N - 1,</p>
+                        <p class="pl-4 text-emerald-300">move(M, X, Z, Y),</p>
+                        <p class="pl-4 text-amber-400 font-semibold">move(1, X, Y, _),</p>
+                        <p class="pl-4 text-emerald-300">move(M, Z, Y, X).</p>
+                    </div>
+                </div>
+
+                <!-- Prolog Logic Explanation -->
+                <div class="mt-4 p-4 bg-slate-900/50 border border-slate-800/80 rounded-lg text-xs space-y-2 text-slate-400">
+                    <h3 class="font-semibold text-slate-200 text-xs">Prolog Execution Logic:</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><strong class="text-slate-300">X</strong> = Source Peg (<code class="text-blue-400">left</code>)</li>
+                        <li><strong class="text-slate-300">Y</strong> = Target Peg (<code class="text-blue-400">right</code>)</li>
+                        <li><strong class="text-slate-300">Z</strong> = Auxiliary Peg (<code class="text-blue-400">center</code>)</li>
+                    </ul>
+                    <p class="pt-1 text-[11px] text-slate-500">
+                        Prolog recursively evaluates how to move <code class="text-slate-400">N</code> disks onto the target peg. During execution, each single move statement lifts the top disk above the stick height, slides it horizontally, and drops it on top of the destination stick.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-3 text-center text-xs text-slate-500">
+        Towers of Hanoi - Prolog Web Simulator
+    </footer>
+
+    <!-- JavaScript Simulator Code -->
+    <script>
+        // Color palette for disks
+        const DISK_COLORS = [
+            'from-red-500 to-rose-600 border-red-400',
+            'from-amber-500 to-yellow-600 border-amber-400',
+            'from-emerald-500 to-teal-600 border-emerald-400',
+            'from-blue-500 to-indigo-600 border-blue-400',
+            'from-purple-500 to-violet-600 border-purple-400',
+            'from-pink-500 to-rose-600 border-pink-400'
+        ];
+
+        // Constants
+        const DISK_HEIGHT = 24; // Height of each disk in px
+        const BASE_Y_OFFSET = 20; // Bottom offset from stage container
+        const TOP_PEG_Y = 220; // Vertical lift clearance height
+
+        // App State
+        let diskCount = 3;
+        let animationSpeed = 700;
+        let isRunning = false;
+        let isPaused = false;
+        let isAnimatingStep = false;
+        let currentStepIndex = 0;
+        let movesQueue = [];
+        let diskElements = {}; // Map disk id to DOM Element
+        let manualMoves = 0, manualSolved = false, autoDone = false;
+        let lastManual = null; // result of the last manual game, kept for comparison
+        let drag = null;
+
+        // Peg state tracking
+        let pegs = {
+            left: [],
+            center: [],
+            right: []
+        };
+
+
+        // ================= Sound Engine (Web Audio, fully synthesized) =================
+        let audioCtx = null;
+        let soundOn = true;
+        let noiseBuffer = null;
+
+        function ensureAudio() {
+            if (!audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return null;
+                audioCtx = new AC();
+                // 1 second of white noise, reused by every whoosh
+                noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+                const data = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        // Filtered-noise sweep: the "whoosh"
+        function playWhoosh(fromHz, toHz, durMs, volume = 0.25, q = 1.4) {
+            if (!soundOn || !ensureAudio()) return;
+            const t = audioCtx.currentTime, d = durMs / 1000;
+            const src = audioCtx.createBufferSource();
+            src.buffer = noiseBuffer; src.loop = true;
+            const bp = audioCtx.createBiquadFilter();
+            bp.type = 'bandpass'; bp.Q.value = q;
+            bp.frequency.setValueAtTime(fromHz, t);
+            bp.frequency.exponentialRampToValueAtTime(toHz, t + d);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(volume, t + d * 0.4);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+            src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
+            src.start(t); src.stop(t + d + 0.05);
+        }
+
+        // Pitch-dropping sine blip: the "pop"
+        function playPop(startHz, endHz, durMs = 120, volume = 0.35) {
+            if (!soundOn || !ensureAudio()) return;
+            const t = audioCtx.currentTime, d = durMs / 1000;
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(startHz, t);
+            osc.frequency.exponentialRampToValueAtTime(endHz, t + d);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(volume, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + d + 0.02);
+        }
+
+        // Disk pops OFF the stick
+        function soundLift(diskId) {
+            playPop(500 + diskId * 60, 1100 + diskId * 80, 110, 0.3);
+            playWhoosh(400, 1800, 180, 0.18);
+        }
+        // Disk flies sideways: pitch rises going right, falls going left
+        function soundSlide(from, to, durMs) {
+            const goingRightVisual = getPegX(to) > getPegX(from);
+            if (goingRightVisual) playWhoosh(500, 2600, durMs, 0.3);
+            else playWhoosh(2600, 500, durMs, 0.3);
+        }
+        // Disk drops back ONTO a stick: falling swish + low thunk-pop (bigger disk = deeper)
+        function soundLand(diskId) {
+            playWhoosh(1800, 300, 140, 0.15);
+            setTimeout(() => {
+                playPop(260 - diskId * 20, 70, 140, 0.45);
+            }, 90);
+        }
+        function soundWin() {
+            [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+                setTimeout(() => playPop(f * 1.5, f, 260, 0.25), i * 110);
+            });
+        }
+
+        const btnSound = document.getElementById('btnSound');
+        btnSound.addEventListener('click', () => {
+            soundOn = !soundOn;
+            document.getElementById('soundIcon').innerText = soundOn ? '🔊' : '🔇';
+            document.getElementById('soundText').innerText = soundOn ? 'Sound On' : 'Sound Off';
+            if (soundOn) { ensureAudio(); playPop(700, 300, 100, 0.25); }
+        });
+        // =============================================================================
+
+        // DOM elements
+        const stageEl = document.getElementById('stage');
+        const disksContainer = document.getElementById('disks-container');
+        const diskCountSelect = document.getElementById('diskCount');
+        const speedSelect = document.getElementById('speedSelect');
+        const btnPlayPause = document.getElementById('btnPlayPause');
+        const playBtnText = document.getElementById('playBtnText');
+        const playIcon = document.getElementById('playIcon');
+        const btnReset = document.getElementById('btnReset');
+        const btnClearConsole = document.getElementById('btnClearConsole');
+        const consoleOutput = document.getElementById('consoleOutput');
+        const stepCounter = document.getElementById('stepCounter');
+        const codeBaseCase = document.getElementById('code-base-case');
+
+        // Center coordinates of pegs relative to stage width
+        function getPegX(pegName) {
+            const stageWidth = stageEl.clientWidth;
+            if (pegName === 'left') return stageWidth * (1 / 6);
+            if (pegName === 'center') return stageWidth * (3 / 6);
+            if (pegName === 'right') return stageWidth * (5 / 6);
+            return 0;
+        }
+
+        // Calculate (X, Y) pixel coordinates for a disk on a specific peg at a given stack index
+        function getDiskPosition(pegName, stackIndex, diskWidth) {
+            const pegX = getPegX(pegName);
+            const x = pegX - (diskWidth / 2);
+            const y = BASE_Y_OFFSET + (stackIndex * (DISK_HEIGHT + 2));
+            return { x, y };
+        }
+
+        // Initialize state
+        function init() {
+            stopAnimation();
+            diskCount = parseInt(diskCountSelect.value, 10);
+            manualMoves = 0; manualSolved = false; autoDone = false; drag = null;
+            document.getElementById('autoPrompt').classList.add('hidden');
+            pegs = { left: [], center: [], right: [] };
+            disksContainer.innerHTML = '';
+            diskElements = {};
+
+            // Populate initial disks on left peg
+            const stageWidth = stageEl.clientWidth || 600;
+            const maxDiskWidth = (stageWidth / 3) * 0.85;
+            const minDiskWidth = 40;
+
+            for (let i = diskCount; i >= 1; i--) {
+                pegs.left.push(i);
+
+                // Calculate disk size
+                const width = minDiskWidth + ((i - 1) / Math.max(1, diskCount - 1)) * (maxDiskWidth - minDiskWidth);
+                const colorClass = DISK_COLORS[(i - 1) % DISK_COLORS.length];
+
+                // Create disk element
+                const diskEl = document.createElement('div');
+                diskEl.className = `animated-disk h-6 rounded-md bg-gradient-to-r ${colorClass} border-t flex items-center justify-center font-mono text-[10px] text-white font-bold`;
+                diskEl.style.width = `${width}px`;
+                diskEl.style.height = `${DISK_HEIGHT}px`;
+                diskEl.innerText = i;
+                diskEl.setAttribute('data-width', width);
+
+                disksContainer.appendChild(diskEl);
+                diskElements[i] = diskEl;
+                diskEl.dataset.id = i;
+                diskEl.addEventListener('pointerdown', onDiskDown);
+                diskEl.addEventListener('pointermove', moveDrag);
+                diskEl.addEventListener('pointerup', endDrag);
+                diskEl.addEventListener('pointercancel', endDrag);
+
+                // Position on left peg
+                const stackIndex = pegs.left.length - 1;
+                const pos = getDiskPosition('left', stackIndex, width);
+                diskEl.style.left = `${pos.x}px`;
+                diskEl.style.bottom = `${pos.y}px`;
+            }
+
+            // Generate full Prolog move queue
+            movesQueue = [];
+            generatePrologMoves(diskCount, 'left', 'right', 'center');
+
+            currentStepIndex = 0;
+            updateStepCounter();
+            resetCodeHighlights();
+            updateStats();
+
+            consoleOutput.innerHTML = `
+                <p class="text-slate-500">% SWI-Prolog environment ready.</p>
+                <p class="text-blue-400 font-semibold">?- move(${diskCount}, left, right, center).</p>
+            `;
+        }
+
+        // Prolog Recursive Solver
+        function generatePrologMoves(n, source, target, auxiliary) {
+            if (n === 1) {
+                movesQueue.push({ disk: 1, from: source, to: target });
+                return;
+            }
+            generatePrologMoves(n - 1, source, auxiliary, target);
+            movesQueue.push({ disk: n, from: source, to: target });
+            generatePrologMoves(n - 1, auxiliary, target, source);
+        }
+
+        // Execute a 3-stage vertical-horizontal-vertical animation for a single step
+        function animateMove(move, callback) {
+            const diskId = pegs[move.from][pegs[move.from].length - 1];
+            const diskEl = diskElements[diskId];
+            const diskWidth = parseFloat(diskEl.getAttribute('data-width'));
+
+            // Target stack height
+            const targetStackIndex = pegs[move.to].length;
+
+            // Remove from source peg, add to destination peg array
+            pegs[move.from].pop();
+            pegs[move.to].push(diskId);
+
+            const duration = Math.max(100, Math.floor(animationSpeed / 3.2));
+            const transitionStyle = `left ${duration}ms ease-in-out, bottom ${duration}ms ease-in-out`;
+
+            diskEl.style.transition = transitionStyle;
+
+            // Stage 1: Lift vertically out of current stick
+            const sourceX = getDiskPosition(move.from, 0, diskWidth).x;
+            diskEl.style.bottom = `${TOP_PEG_Y}px`;
+            soundLift(diskId);
+
+            setTimeout(() => {
+                soundSlide(move.from, move.to, duration);
+                // Stage 2: Slide horizontally across the top of the sticks
+                const targetX = getDiskPosition(move.to, 0, diskWidth).x;
+                diskEl.style.left = `${targetX}px`;
+
+                setTimeout(() => {
+                    // Stage 3: Drop vertically down onto target stick
+                    const targetPos = getDiskPosition(move.to, targetStackIndex, diskWidth);
+                    diskEl.style.bottom = `${targetPos.y}px`;
+
+                    setTimeout(() => {
+                        soundLand(diskId);
+                        callback();
+                    }, duration);
+
+                }, duration);
+
+            }, duration);
+        }
+
+        // Execute step with animation and logging
+        function executeStep(doneCallback) {
+            if (currentStepIndex >= movesQueue.length) {
+                finishSolving();
+                if (doneCallback) doneCallback();
+                return;
+            }
+
+            isAnimatingStep = true;
+            const move = movesQueue[currentStepIndex];
+
+            // Print Prolog console output & highlight code
+            logToConsole(`Move top disk from ${move.from} to ${move.to}`, 'move');
+            highlightCode();
+
+            animateMove(move, () => {
+                currentStepIndex++;
+                updateStepCounter();
+                isAnimatingStep = false;
+
+                if (currentStepIndex >= movesQueue.length) {
+                    finishSolving();
+                }
+
+                if (doneCallback) doneCallback();
+            });
+        }
+
+        // Animation Loop Control
+        function stepLoop() {
+            if (!isRunning || isPaused) return;
+
+            if (currentStepIndex >= movesQueue.length) {
+                finishSolving();
+                return;
+            }
+
+            executeStep(() => {
+                if (isRunning && !isPaused && currentStepIndex < movesQueue.length) {
+                    setTimeout(stepLoop, 50);
+                }
+            });
+        }
+
+        function startAnimation() {
+            ensureAudio(); // must be created from a user gesture
+            if (currentStepIndex >= movesQueue.length || manualMoves > 0) {
+                if (manualMoves > 0) lastManual = { moves: manualMoves, disks: diskCount, solved: manualSolved };
+                init();
+            }
+
+            isRunning = true;
+            isPaused = false;
+            updateButtonState();
+
+            if (!isAnimatingStep) {
+                stepLoop();
+            }
+        }
+
+        function pauseAnimation() {
+            isPaused = true;
+            updateButtonState();
+        }
+
+        function stopAnimation() {
+            isRunning = false;
+            isPaused = false;
+            isAnimatingStep = false;
+            updateButtonState();
+        }
+
+        function finishSolving() {
+            stopAnimation();
+            logToConsole(`true. % Solved in ${movesQueue.length} moves!`, 'highlight');
+            autoDone = true;
+            if (lastManual && lastManual.disks === diskCount) logToConsole(`% You: ${lastManual.moves} moves | Prolog: ${movesQueue.length} moves`, 'highlight');
+            updateStats();
+            setTimeout(soundWin, 250);
+        }
+
+        function highlightCode() {
+            codeBaseCase.classList.add('highlight-line');
+            setTimeout(() => {
+                codeBaseCase.classList.remove('highlight-line');
+            }, animationSpeed * 0.8);
+        }
+
+        function resetCodeHighlights() {
+            codeBaseCase.classList.remove('highlight-line');
+        }
+
+        function updateStepCounter() {
+            stepCounter.innerText = `Move: ${currentStepIndex} / ${movesQueue.length}`;
+        }
+
+        function logToConsole(message, type = 'normal') {
+            const p = document.createElement('p');
+            if (type === 'move') {
+                p.className = 'text-emerald-400 font-mono font-medium';
+            } else if (type === 'highlight') {
+                p.className = 'text-amber-300 font-mono';
+            } else {
+                p.className = 'text-slate-300 font-mono';
+            }
+            p.innerText = message;
+            consoleOutput.appendChild(p);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        function updateButtonState() {
+            if (isRunning && !isPaused) {
+                playBtnText.innerText = 'Pause';
+                playIcon.innerHTML = `<path d="M5 4h3v12H5V4zm7 0h3v12h-3V4z"/>`;
+                btnPlayPause.className = 'bg-amber-600 hover:bg-amber-500 text-white font-medium px-4 py-1.5 rounded-lg text-sm flex items-center space-x-2 transition shadow-md shadow-amber-600/30';
+            } else {
+                playBtnText.innerText = currentStepIndex > 0 ? 'Resume' : 'Auto Solve';
+                playIcon.innerHTML = `<path d="M4 4l12 6-12 6V4z"/>`;
+                btnPlayPause.className = 'bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-1.5 rounded-lg text-sm flex items-center space-x-2 transition shadow-md shadow-blue-600/30';
+            }
+        }
+
+        // ================= Manual play (drag & drop) =================
+        const PEG_NAMES = ['left', 'center', 'right'];
+        const statYou = document.getElementById('statYou');
+        const statOpt = document.getElementById('statOpt');
+        const statEff = document.getElementById('statEff');
+        const hintEl = document.getElementById('hint');
+        const btnDone = document.getElementById('btnDone');
+        const autoPrompt = document.getElementById('autoPrompt');
+
+        btnDone.addEventListener('click', () => {
+            autoPrompt.classList.remove('hidden');
+        });
+        document.getElementById('btnAutoYes').addEventListener('click', () => {
+            autoPrompt.classList.add('hidden');
+            startAnimation(); // resets the board and plays the Prolog solution
+        });
+        document.getElementById('btnAutoNo').addEventListener('click', () => {
+            autoPrompt.classList.add('hidden');
+        });
+
+        function setHint(msg, bad) {
+            hintEl.innerText = msg;
+            hintEl.className = 'mt-3 text-xs text-center ' + (bad ? 'text-red-400' : 'text-slate-400');
+        }
+
+        function updateStats() {
+            const opt = Math.pow(2, diskCount) - 1;
+            statYou.innerText = manualMoves;
+            statOpt.innerText = opt;
+            statEff.innerText = manualSolved ? Math.round(opt / manualMoves * 100) + '%' : '-';
+            const last = lastManual && lastManual.disks === diskCount ? lastManual : null;
+            if (manualSolved) {
+                setHint(manualMoves === opt
+                    ? `Perfect! You matched the Prolog solution (${opt} moves).`
+                    : `Solved in ${manualMoves} moves. Prolog needs ${opt}, so you used ${manualMoves - opt} extra.`);
+            } else if (autoDone) {
+                setHint(`Auto solver finished in ${opt} moves (2^${diskCount} - 1).` +
+                    (last ? ` Your last try: ${last.moves} moves${last.solved ? '' : ' (unfinished)'}.` : ''));
+            } else if (last) {
+                setHint(`Last manual try: ${last.moves} moves${last.solved ? '' : ' (unfinished)'} vs ${opt} for Prolog. Beat it!`);
+            } else {
+                setHint('Drag the top disk of any peg. Goal: move the whole stack to another peg, then press Done.');
+            }
+        }
+
+        function snapDisk(el, peg, index, width) {
+            const pos = getDiskPosition(peg, index, width);
+            el.style.left = `${pos.x}px`;
+            el.style.bottom = `${pos.y}px`;
+        }
+
+        function onDiskDown(e) {
+            const el = e.currentTarget;
+            const id = parseInt(el.dataset.id, 10);
+            if (isRunning || isAnimatingStep || currentStepIndex > 0) { setHint('Press Reset to play manually.', true); return; }
+            if (manualSolved) { setHint('Solved! Press Reset to try again.'); return; }
+            const from = PEG_NAMES.find(n => pegs[n][pegs[n].length - 1] === id);
+            if (!from) { setHint('Only the top disk of a peg can be moved.', true); return; }
+            ensureAudio();
+            drag = { id, el, from, width: parseFloat(el.dataset.width) };
+            el.style.transition = 'none';
+            el.classList.add('dragging');
+            el.setPointerCapture(e.pointerId);
+            soundLift(id);
+            moveDrag(e);
+        }
+
+        function moveDrag(e) {
+            if (!drag) return;
+            const r = stageEl.getBoundingClientRect();
+            drag.el.style.left = `${e.clientX - r.left - drag.width / 2}px`;
+            drag.el.style.bottom = `${r.bottom - e.clientY - DISK_HEIGHT / 2}px`;
+        }
+
+        function endDrag(e) {
+            if (!drag) return;
+            const d = drag; drag = null;
+            d.el.classList.remove('dragging');
+            const r = stageEl.getBoundingClientRect();
+            const idx = Math.max(0, Math.min(2, Math.floor((e.clientX - r.left) / (r.width / 3))));
+            const to = PEG_NAMES[idx];
+            const top = pegs[to][pegs[to].length - 1];
+            const legal = to !== d.from && (top === undefined || top > d.id);
+            d.el.style.transition = 'left 150ms ease-out, bottom 150ms ease-out';
+            if (legal) {
+                pegs[d.from].pop(); pegs[to].push(d.id);
+                manualMoves++;
+                logToConsole(`Move top disk from ${d.from} to ${to}`, 'move');
+                snapDisk(d.el, to, pegs[to].length - 1, d.width);
+                soundLand(d.id);
+                if (pegs.right.length === diskCount || pegs.center.length === diskCount) {
+                    manualSolved = true;
+                    logToConsole(`true. % You solved it in ${manualMoves} moves`, 'highlight');
+                    setTimeout(soundWin, 250);
+                }
+                updateStats();
+            } else {
+                snapDisk(d.el, d.from, pegs[d.from].length - 1, d.width);
+                if (to !== d.from) { setHint('Illegal move: a bigger disk cannot sit on a smaller one.', true); playPop(200, 90, 140, 0.35); }
+            }
+        }
+        // =============================================================
+
+        // Event Listeners
+        btnPlayPause.addEventListener('click', () => {
+            if (!isRunning || isPaused) {
+                startAnimation();
+            } else {
+                pauseAnimation();
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            init();
+        });
+
+        diskCountSelect.addEventListener('change', () => {
+            init();
+        });
+
+        speedSelect.addEventListener('change', (e) => {
+            animationSpeed = parseInt(e.target.value, 10);
+        });
+
+        btnClearConsole.addEventListener('click', () => {
+            consoleOutput.innerHTML = '';
+        });
+
+        window.addEventListener('resize', () => {
+            if (!isRunning && currentStepIndex === 0 && manualMoves === 0) {
+                init();
+            }
+        });
+
+        // Initialize application on load
+        window.onload = init;
+    </script>
+</body>
+</html>
